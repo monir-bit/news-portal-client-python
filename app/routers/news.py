@@ -219,16 +219,18 @@ async def news_by_category(
         # just keyset-paginate the base query directly (mirrors `$load(true)`).
         page, next_cursor = await keyset_paginate(db, stmt, News.date, News.id, 12, cursor)
         items = [i.model_dump(mode="json") for i in await serialize_news_list(db, page)]
-        return cursor_page_envelope(items, next_cursor, 12, f"/api/news-by-category/{slug}")
+        return cursor_page_envelope(items, next_cursor, 12, request)
 
     lead_news, news_page, next_cursor = await paginate_after_leads(db, stmt, None)
-    return await build_full_listing_payload(db, category, lead_news, news_page, next_cursor)
+    return await build_full_listing_payload(db, category, lead_news, news_page, next_cursor, request)
 
 
 @router.get("/news-by-category-sports")
-async def news_by_category_sports_route(cursor: str | None = None, db: AsyncSession = Depends(get_db)):
+async def news_by_category_sports_route(
+    request: Request, cursor: str | None = None, db: AsyncSession = Depends(get_db)
+):
     try:
-        return await _news_by_category_sports(db, cursor)
+        return await _news_by_category_sports(db, cursor, request)
     except NoResultFound:
         raise not_found("Category")
 
@@ -292,7 +294,7 @@ async def news_by_category_print(date: str | None = None, db: AsyncSession = Dep
 
 @router.get("/news-by-print-category/{slug}")
 async def news_by_print_category(
-    slug: str, date: str | None = None, cursor: str | None = None, db: AsyncSession = Depends(get_db)
+    slug: str, request: Request, date: str | None = None, cursor: str | None = None, db: AsyncSession = Depends(get_db)
 ):
     try:
         category = await resolve_visible_category(db, slug)
@@ -312,25 +314,25 @@ async def news_by_print_category(
     if cursor:
         page, next_cursor = await keyset_paginate(db, stmt, News.date, News.id, 12, cursor)
         items = [i.model_dump(mode="json") for i in await serialize_news_list(db, page)]
-        return cursor_page_envelope(items, next_cursor, 12, f"/api/news-by-print-category/{slug}")
+        return cursor_page_envelope(items, next_cursor, 12, request)
 
     lead_news, news_page, next_cursor = await paginate_after_leads(db, stmt, None)
     print_edition_children = (
         await categories_ordered_for_print_edition(db, parsed_date) if parsed_date else None
     )
     return await build_full_listing_payload(
-        db, category, lead_news, news_page, next_cursor, print_edition_children=print_edition_children
+        db, category, lead_news, news_page, next_cursor, request, print_edition_children=print_edition_children
     )
 
 
 @router.get("/latest-news")
-async def latest_news_route(cursor: str | None = None, db: AsyncSession = Depends(get_db)):
+async def latest_news_route(request: Request, cursor: str | None = None, db: AsyncSession = Depends(get_db)):
     stmt = select(News).where(News.published.is_(True), News.deleted_at.is_(None)).options(
         selectinload(News.category)
     )
     page, next_cursor = await keyset_paginate(db, stmt, News.date, News.id, 20, cursor)
     items = [i.model_dump(mode="json") for i in await serialize_news_list(db, page)]
-    return cursor_page_envelope(items, next_cursor, 20, "/api/latest-news")
+    return cursor_page_envelope(items, next_cursor, 20, request)
 
 
 @router.get("/search")
@@ -356,17 +358,18 @@ async def search_news(request: Request, response: Response, query: str = "", pag
     rows = (await db.execute(stmt)).scalars().all()
     items = [i.model_dump(mode="json") for i in await serialize_news_list(db, rows)]
     last_page = max(1, (total + per_page - 1) // per_page)
+    base = str(request.url.replace(query=None))
     return {
         "data": items,
         "links": {
-            "first": f"/api/search?query={query}&page=1",
-            "last": f"/api/search?query={query}&page={last_page}",
-            "prev": f"/api/search?query={query}&page={page - 1}" if page > 1 else None,
-            "next": f"/api/search?query={query}&page={page + 1}" if page < last_page else None,
+            "first": f"{base}?query={query}&page=1",
+            "last": f"{base}?query={query}&page={last_page}",
+            "prev": f"{base}?query={query}&page={page - 1}" if page > 1 else None,
+            "next": f"{base}?query={query}&page={page + 1}" if page < last_page else None,
         },
         "meta": {
             "current_page": page, "from": (page - 1) * per_page + 1 if items else None,
-            "last_page": last_page, "path": "/api/search", "per_page": per_page,
+            "last_page": last_page, "path": base, "per_page": per_page,
             "to": (page - 1) * per_page + len(items) if items else None, "total": total,
         },
     }
@@ -386,7 +389,7 @@ async def news_by_tags(name: str, request: Request, cursor: str | None = None, d
     )
     page, next_cursor = await keyset_paginate(db, stmt, News.created_at, News.id, 20, cursor)
     items = [i.model_dump(mode="json") for i in await serialize_news_list(db, page)]
-    envelope = cursor_page_envelope(items, next_cursor, 20, f"/api/news-by-tags/{name}")
+    envelope = cursor_page_envelope(items, next_cursor, 20, request)
 
     if "cursor" in request.query_params:
         return envelope
@@ -414,7 +417,7 @@ async def news_by_author(slug: str, request: Request, cursor: str | None = None,
     )
     page, next_cursor = await keyset_paginate(db, stmt, News.created_at, News.id, 20, cursor)
     items = [i.model_dump(mode="json") for i in await serialize_news_list(db, page)]
-    envelope = cursor_page_envelope(items, next_cursor, 20, f"/api/news-by-author/{slug}")
+    envelope = cursor_page_envelope(items, next_cursor, 20, request)
 
     if "cursor" in request.query_params:
         return envelope

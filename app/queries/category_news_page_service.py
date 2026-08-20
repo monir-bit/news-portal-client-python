@@ -3,6 +3,7 @@
 
 from datetime import datetime
 
+from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,6 +137,7 @@ async def build_full_listing_payload(
     lead_news: list[News],
     news_page: list[News],
     next_cursor: str | None,
+    request: Request,
     print_edition_children: list[Category] | None = None,
 ) -> dict:
     """Mirrors buildFullListingPayload()."""
@@ -163,6 +165,9 @@ async def build_full_listing_payload(
 
     most_read = await most_read_news_by_category(session, category.id)
 
+    full_path = str(request.url.replace(query=None))
+    next_url = f"{full_path}?cursor={next_cursor}" if next_cursor else None
+
     return {
         "category": (await category_list_item(session, category)).model_dump(mode="json"),
         "seo_meta": make_seo(
@@ -177,8 +182,8 @@ async def build_full_listing_payload(
             "lead_news": [i.model_dump(mode="json") for i in await serialize_news_list(session, lead_news)],
             "news": {
                 "data": [i.model_dump(mode="json") for i in await serialize_news_list(session, news_page)],
-                "links": {"next": (f"?cursor={next_cursor}" if next_cursor else None), "prev": None},
-                "meta": {"next_cursor": next_cursor, "prev_cursor": None},
+                "links": {"next": next_url, "prev": None},
+                "meta": {"next_cursor": next_cursor, "prev_cursor": None, "next_page_url": next_url},
             },
         },
         "most_read_news": most_read,

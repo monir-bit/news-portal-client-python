@@ -26,11 +26,10 @@ import json
 from datetime import datetime
 from typing import Any
 
+from fastapi import Request
 from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
-
-from app.core.config import settings
 
 
 def encode_cursor(dt: datetime, id_value: int) -> str:
@@ -75,15 +74,16 @@ async def keyset_paginate(
     return page, next_cursor
 
 
-def cursor_page_envelope(data: list[Any], next_cursor: str | None, per_page: int, path: str) -> dict:
+def cursor_page_envelope(data: list[Any], next_cursor: str | None, per_page: int, request: Request) -> dict:
     """Mirrors Laravel's automatic cursor-paginator JSON shape closely enough
     for a frontend to consume (`data`/`links`/`meta`), with `prev`/`prev_cursor`
     always null per the scope cut documented above.
 
-    `path` is app-relative (e.g. `/api/latest-news`); it's resolved against
-    `APP_URL` here so `meta.path`/`next_page_url`/`links.next` are absolute,
-    matching Laravel's cursor-paginator output."""
-    full_path = f"{settings.app_url.rstrip('/')}{path}" if settings.app_url else path
+    `meta.path`/`next_page_url`/`links.next` are built from the incoming
+    request's own URL (scheme+host+path, query string stripped) rather than a
+    configured base URL, so they're always correct for whatever host/scheme
+    the request actually came in on."""
+    full_path = str(request.url.replace(query=None))
     next_url = f"{full_path}?cursor={next_cursor}" if next_cursor else None
     return {
         "data": data,

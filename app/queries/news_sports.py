@@ -1,3 +1,4 @@
+from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
@@ -16,7 +17,7 @@ from app.queries.applications import (
 from app.queries.news_common import category_list_item, serialize_news_list
 
 
-async def news_by_category_sports(session: AsyncSession, cursor: str | None) -> dict:
+async def news_by_category_sports(session: AsyncSession, cursor: str | None, request: Request) -> dict:
     """Mirrors NewsController::newsByCategorySports()."""
     category = (
         await session.execute(
@@ -68,7 +69,7 @@ async def news_by_category_sports(session: AsyncSession, cursor: str | None) -> 
     others_items = [i.model_dump(mode="json") for i in await serialize_news_list(session, others_page)]
 
     if cursor:
-        return cursor_page_envelope(others_items, next_cursor, 12, "/api/news-by-category-sports")
+        return cursor_page_envelope(others_items, next_cursor, 12, request)
 
     parent_category = category.parent if category.parent_id else category
     return {
@@ -80,7 +81,7 @@ async def news_by_category_sports(session: AsyncSession, cursor: str | None) -> 
             "selected": await category_page_layout_wise_news(session, category.id, "selected", 15),
             "cricket": [i.model_dump(mode="json") for i in await serialize_news_list(session, cricket_news)],
             "football": [i.model_dump(mode="json") for i in await serialize_news_list(session, football_news)],
-            "others": cursor_page_envelope(others_items, next_cursor, 12, "/api/news-by-category-sports"),
+            "others": cursor_page_envelope(others_items, next_cursor, 12, request),
         },
         "latest_news": await latest_news(session),
         "most_read_news_all": await most_read_news(session),

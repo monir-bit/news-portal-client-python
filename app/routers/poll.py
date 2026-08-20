@@ -53,7 +53,7 @@ async def index(request: Request, per_page: int = 30, page: int = 1, db: AsyncSe
     data = [await serialize_poll(db, p, ip) for p in polls]
 
     last_page = max(1, (total + per_page - 1) // per_page)
-    base = "/api/polls"
+    base = str(request.url.replace(query=None))
 
     return {
         "data": data,
