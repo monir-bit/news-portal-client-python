@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     app_name: str = "News Portal API (FastAPI port)"
     app_env: str = "local"
     app_timezone: str = "Asia/Dhaka"
+    app_url: str = ""
 
     db_connection: str = "pgsql"
     db_host: str = "10.68.240.29"
