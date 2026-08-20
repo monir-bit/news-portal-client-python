@@ -2,12 +2,9 @@ from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL
 
-# This project's OWN .env, at the fastapi-project/ root — NOT read directly
-# from the Laravel app's .env. Copy values over manually (see .env.example)
-# when the Laravel side's credentials change; the two are intentionally
-# decoupled so this project can point at a different DB/bucket without
-# touching (or being silently affected by) the Laravel app's config.
+
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
@@ -22,34 +19,40 @@ class Settings(BaseSettings):
     app_env: str = "local"
     app_timezone: str = "Asia/Dhaka"
 
-    # Same names as the Laravel .env so both apps share one source of truth.
     db_connection: str = "pgsql"
-    db_host: str = "127.0.0.1"
+    db_host: str = "10.68.240.29"
     db_port: int = 5432
-    db_database: str = "agamir_somoy"
-    db_username: str = "postgres"
-    db_password: str = ""
+    db_database: str = "agamirdb_bangla"
+    db_username: str = "agamirdb_bangla"
+    db_password: str = "AgamirDB@!Bangla1"
 
-    # Media URL resolution: mirrors UtilsHelper::GetMediaUrl(), which resolves
-    # relative storage paths against config('filesystems.default')'s public URL.
-    # Laravel's default disk is `r2`, whose public URL is R2_PUBLIC_URL.
-    filesystem_disk: str = "r2"
-    r2_public_url: str = ""
-    r2_endpoint: str = ""
-    r2_bucket: str = ""
-    r2_access_key_id: str = ""
-    r2_secret_access_key: str = ""
+    filesystem_disk: str = "s3"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_default_region: str = "us-east-1"
+    aws_bucket: str = ""
+    aws_endpoint: str = ""
+    aws_use_path_style_endpoint: bool = False
+    aws_url: str = ""
 
     @property
-    def database_url(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.db_username}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_database}"
+    def database_url(self) -> URL:
+        return URL.create(
+            drivername="postgresql+asyncpg",
+            username=self.db_username,
+            password=self.db_password,
+            host=self.db_host,
+            port=self.db_port,
+            database=self.db_database,
         )
 
     @property
     def media_base_url(self) -> str:
-        return self.r2_public_url.rstrip("/")
+        if self.aws_url:
+            return self.aws_url.rstrip("/")
+        if self.aws_use_path_style_endpoint and self.aws_endpoint:
+            return f"{self.aws_endpoint.rstrip('/')}/{self.aws_bucket}"
+        return self.aws_endpoint.rstrip("/")
 
 
 @lru_cache

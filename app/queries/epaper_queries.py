@@ -312,18 +312,21 @@ async def get_reader_show(db: AsyncSession, slug: str, date_str: str, revision_i
 def _s3_client():
     return boto3.client(
         "s3",
-        endpoint_url=settings.r2_endpoint,
-        aws_access_key_id=settings.r2_access_key_id,
-        aws_secret_access_key=settings.r2_secret_access_key,
-        config=BotoConfig(signature_version="s3v4"),
-        region_name="auto",
+        endpoint_url=settings.aws_endpoint,
+        aws_access_key_id=settings.aws_access_key_id,
+        aws_secret_access_key=settings.aws_secret_access_key,
+        region_name=settings.aws_default_region,
+        config=BotoConfig(
+            signature_version="s3v4",
+            s3={"addressing_style": "path" if settings.aws_use_path_style_endpoint else "auto"},
+        ),
     )
 
 
 def _fetch_object_bytes_sync(path: str) -> bytes:
     client = _s3_client()
     try:
-        obj = client.get_object(Bucket=settings.r2_bucket, Key=path.lstrip("/"))
+        obj = client.get_object(Bucket=settings.aws_bucket, Key=path.lstrip("/"))
         return obj["Body"].read()
     except ClientError as exc:
         code = exc.response.get("Error", {}).get("Code", "")
