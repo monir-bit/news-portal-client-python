@@ -4,7 +4,7 @@ __pycache__/
 *.pyc
 uploads/
 /.idea
- .htaccess
+.htaccess
 gunicorn.pid
 gunicorn_conf.py
 uwsgi.ini
