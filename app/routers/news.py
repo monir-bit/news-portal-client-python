@@ -70,7 +70,11 @@ async def news_details(slug: str, request: Request, db: AsyncSession = Depends(g
         raise not_found("News")
 
     # Fire-and-forget read tracking (mirrors NewsReadService::read()) — never
-    # affects the response even if it fails.
+    # affects the response even if it fails. Runs in a SAVEPOINT so a failure
+    # here only unwinds this insert, instead of a full session rollback that
+    # would expire (and force a re-fetch of) the `news` object and its
+    # eager-loaded relationships accessed below — which crashes under
+    # AsyncSession since implicit lazy-loads can't run outside an await.
     visitor_id = request.headers.get("X-Visitor-ID")
     if visitor_id:
         try:
@@ -85,10 +89,11 @@ async def news_details(slug: str, request: Request, db: AsyncSession = Depends(g
                 )
                 .on_conflict_do_nothing()
             )
-            await db.execute(insert_stmt)
+            async with db.begin_nested():
+                await db.execute(insert_stmt)
             await db.commit()
         except Exception:
-            await db.rollback()
+            pass
 
     category_item = await category_list_item(db, news.category) if news.category else None
     news_url = f"/{category_item.path}/{news.slug_key}" if category_item else f"/{news.slug_key}"
