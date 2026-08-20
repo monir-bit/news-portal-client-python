@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
 from app.core.category_tree import descendant_ids_by_slug
-from app.core.pagination import keyset_paginate
+from app.core.pagination import keyset_paginate, resolve_base_path
 from app.models.category import Category
 from app.models.geo import District, Division, Upazila
 from app.models.layout import PageCategoryMap
@@ -165,7 +165,7 @@ async def build_full_listing_payload(
 
     most_read = await most_read_news_by_category(session, category.id)
 
-    full_path = str(request.url.replace(query=None))
+    full_path = resolve_base_path(request)
     next_url = f"{full_path}?cursor={next_cursor}" if next_cursor else None
 
     return {

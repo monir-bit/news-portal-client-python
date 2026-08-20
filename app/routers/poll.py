@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.enums import PollPage
+from app.core.pagination import resolve_base_path
 from app.core.rate_limit import VOTES, limiter
 from app.models.poll import PollOption, PollVote
 from app.queries.poll_queries import (
@@ -53,7 +54,7 @@ async def index(request: Request, per_page: int = 30, page: int = 1, db: AsyncSe
     data = [await serialize_poll(db, p, ip) for p in polls]
 
     last_page = max(1, (total + per_page - 1) // per_page)
-    base = str(request.url.replace(query=None))
+    base = resolve_base_path(request)
 
     return {
         "data": data,

@@ -31,6 +31,8 @@ from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
+from app.core.config import settings
+
 
 def encode_cursor(dt: datetime, id_value: int) -> str:
     payload = json.dumps([dt.isoformat(), id_value])
@@ -74,16 +76,23 @@ async def keyset_paginate(
     return page, next_cursor
 
 
+def resolve_base_path(request: Request) -> str:
+    """The current request's path with an absolute base in front of it, for
+    building pagination links. Prefers `APP_URL` (config) over the request's
+    own scheme+host: behind this deployment's reverse proxy, `request.url`
+    resolves to the internal bind address (e.g. `127.0.0.1:443`), not the
+    public domain, so it can't be trusted here. Falls back to the request's
+    own URL only when `APP_URL` isn't configured (e.g. local dev)."""
+    if settings.app_url:
+        return f"{settings.app_url.rstrip('/')}{request.url.path}"
+    return str(request.url.replace(query=None))
+
+
 def cursor_page_envelope(data: list[Any], next_cursor: str | None, per_page: int, request: Request) -> dict:
     """Mirrors Laravel's automatic cursor-paginator JSON shape closely enough
     for a frontend to consume (`data`/`links`/`meta`), with `prev`/`prev_cursor`
-    always null per the scope cut documented above.
-
-    `meta.path`/`next_page_url`/`links.next` are built from the incoming
-    request's own URL (scheme+host+path, query string stripped) rather than a
-    configured base URL, so they're always correct for whatever host/scheme
-    the request actually came in on."""
-    full_path = str(request.url.replace(query=None))
+    always null per the scope cut documented above."""
+    full_path = resolve_base_path(request)
     next_url = f"{full_path}?cursor={next_cursor}" if next_cursor else None
     return {
         "data": data,

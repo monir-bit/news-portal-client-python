@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import portal_time
 from app.core.database import get_db
 from app.core.media import get_media_url
-from app.core.pagination import cursor_page_envelope, keyset_paginate
+from app.core.pagination import cursor_page_envelope, keyset_paginate, resolve_base_path
 from app.core.rate_limit import SEARCH, limiter
 from app.core.seo import make_seo
 from app.models.category import Category
@@ -358,7 +358,7 @@ async def search_news(request: Request, response: Response, query: str = "", pag
     rows = (await db.execute(stmt)).scalars().all()
     items = [i.model_dump(mode="json") for i in await serialize_news_list(db, rows)]
     last_page = max(1, (total + per_page - 1) // per_page)
-    base = str(request.url.replace(query=None))
+    base = resolve_base_path(request)
     return {
         "data": items,
         "links": {

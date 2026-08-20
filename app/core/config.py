@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     app_name: str = "News Portal API (FastAPI port)"
     app_env: str = "local"
     app_timezone: str = "Asia/Dhaka"
+    # Public base URL this API is served from (scheme + domain, no trailing
+    # slash — e.g. https://api.agamirsomoy.com). Used to build absolute
+    # pagination links (meta.path / next_page_url / links.next) instead of
+    # trusting the request's own Host, since behind this deployment's reverse
+    # proxy `request.url` resolves to the internal bind address
+    # (127.0.0.1:443), not the public domain.
+    app_url: str = ""
 
     db_connection: str = "pgsql"
     db_host: str = "10.68.240.29"
